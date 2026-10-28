@@ -1,24 +1,19 @@
 #include <iostream>
 #include <SDL2/SDL.h>
 #include "elf_parser.h"
+#include "renderer.h"
 
-// أبعاد شاشة اللعبة الافتراضية لبورت الهاتف
 const int SCREEN_WIDTH = 1280;
 const int SCREEN_HEIGHT = 720;
 
 int main(int argc, char* argv[]) {
     std::cout << "--- OpenGOW2 Native C++ Engine Initialized ---" << std::endl;
 
-    // 1. تشغيل محلل الـ ELF لقراءة نواة لعبة God of War 2
+    // 1. تشغيل محلل الـ ELF وقراءة البيانات النواتية للعبة
     std::string elf_file_path = "GOW2_EXECUTABLE.ELF";
-    std::cout << "🎮 Loading Core Game Logic..." << std::endl;
-    
-    // استدعاء دالة الفحص الذكي لتفكيك وقراءة ملف الـ ELF المستخرج
-    if (!GOW2ElfParser::parseELF(elf_file_path)) {
-        std::cerr << "⚠️ Warning: Continuing engine initialization without core game logic for testing." << std::endl;
-    }
+    GOW2ElfParser::parseELF(elf_file_path);
 
-    // 2. تهيئة مكتبة الرسوميات والمحرك الرسومي (SDL2)
+    // 2. تهيئة مكتبة الرسوميات (SDL2)
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) < 0) {
         std::cerr << "❌ SDL Could not initialize! Error: " << SDL_GetError() << std::endl;
         return -1;
@@ -38,27 +33,42 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    std::cout << "✅ Native Game Window Created Successfully!" << std::endl;
+    // 4. تشغيل محرك الرسوميات (OpenGL ES 2.0)
+    GOW2Renderer renderer;
+    if (!renderer.initGraphics(window)) {
+        std::cerr << "❌ Failed to initialize Graphics Renderer!" << std::endl;
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return -1;
+    }
 
-    // دورة اللعبة الافتراضية المؤقتة للاختبار
+    // دورة اللعبة الحقيقية (Game Loop) لتردد الفريمات
     bool isRunning = true;
     SDL_Event event;
     Uint32 startTime = SDL_GetTicks();
 
     while (isRunning) {
+        // فحص مدخلات المستخدم أو أزرار التحكم
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 isRunning = false;
             }
         }
         
-        // إغلاق تلقائي بعد 5 ثوانٍ في هذه المرحلة التجريبية
+        // مسح الشاشة وتلوينها بالخلفية الداكنة للعبة (60 فريم في الثانية)
+        renderer.clearScreen();
+        
+        // تحديث وعرض الفريمات على شاشة الهاتف
+        SDL_GL_SwapWindow(window);
+
+        // إغلاق تلقائي بعد 5 ثوانٍ في هذا الطور التجريبي
         if (SDL_GetTicks() - startTime > 5000) {
             isRunning = false;
         }
     }
 
-    // 4. إغلاق وتنظيف الذاكرة
+    // 5. إغلاق وتنظيف الذاكرة بالكامل عند الخروج
+    renderer.shutdown();
     SDL_DestroyWindow(window);
     SDL_Quit();
 
